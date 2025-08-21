@@ -32,18 +32,7 @@ main :: proc() {
     event: SDL.Event
     for running {
         for SDL.PollEvent(&event) {
-            if event.type == .WINDOWEVENT &&
-               event.window.event == .RESIZED
-            {
-                // NOTE: currently, game crashes (@line 123) when WindowSize is odd (indexes out-bounds)
-                newWidth:  c.int = event.window.data1
-                newHeight: c.int = event.window.data2
-
-                if newWidth  % 2 != 0 do newWidth  -= 1
-                if newHeight % 2 != 0 do newHeight -= 1
-
-                SDL.SetWindowSize(window, newWidth, newHeight)
-            } else if event.type == .QUIT {
+            if event.type == .QUIT {
                 running = false
             }
         }
@@ -90,22 +79,22 @@ main :: proc() {
                 for x in 0..<windowSize.x {
                     color := Pixel{}
 
-                    // The two vertical blank bars (on the left and right)
-                    // The two horisontal blank bars (on top and bottom)
-                    // Will have the same size respectively
-                    verticalBoxSize   := PxPos{ xDiff/2, windowSize.y }
-                    horisontalBoxSize := PxPos{ windowSize.x, yDiff/2 }
+                    // When the windowSize is odd, the right or bottom black bar will be 1px bigger
+                    leftBoxSize   := PxPos{ xDiff/2, windowSize.y }
+                    rightBoxSize   := PxPos{ xDiff/2 + xDiff%2, windowSize.y }
+                    topBoxSize := PxPos{ windowSize.x, yDiff/2 }
+                    botBoxSize := PxPos{ windowSize.x, yDiff/2+yDiff%2 }
 
                     leftBoxPos := PxPos{ 0, 0 }
-                    rightBoxPos := PxPos{ verticalBoxSize.x + gameAreaSize.x, 0 }
+                    rightBoxPos := PxPos{ leftBoxSize.x + gameAreaSize.x, 0 }
                     topBoxPos := PxPos{ 0, 0 }
-                    botBoxPos := PxPos{ 0, horisontalBoxSize.y + gameAreaSize.y }
+                    botBoxPos := PxPos{ 0, topBoxSize.y + gameAreaSize.y }
 
 
-                    leftBoxCollide := IsPointInsideRect( { x, y }, leftBoxPos, verticalBoxSize)
-                    rightBoxCollide := IsPointInsideRect( { x, y }, rightBoxPos, verticalBoxSize)
-                    topBoxCollide := IsPointInsideRect( { x, y }, topBoxPos, horisontalBoxSize)
-                    botBoxCollide := IsPointInsideRect( { x, y }, botBoxPos, horisontalBoxSize)
+                    leftBoxCollide := IsPointInsideRect( { x, y }, leftBoxPos, leftBoxSize)
+                    rightBoxCollide := IsPointInsideRect( { x, y }, rightBoxPos, rightBoxSize)
+                    topBoxCollide := IsPointInsideRect( { x, y }, topBoxPos, topBoxSize)
+                    botBoxCollide := IsPointInsideRect( { x, y }, botBoxPos, botBoxSize)
 
                     if !(leftBoxCollide || rightBoxCollide  ||
                        topBoxCollide || botBoxCollide) {
