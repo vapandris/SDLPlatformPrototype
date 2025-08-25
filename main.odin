@@ -29,11 +29,8 @@ AppState :: struct {
     appContext: runtime.Context,
 }
 
-GlobalContext: runtime.Context;
-
 AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [^]cstring) -> SDL.AppResult {
-    GlobalContext = runtime.default_context()
-    context = GlobalContext
+    context = runtime.default_context()
 
     appState := new(AppState); assert(appState != nil, "Failed to allocate appState")
 
@@ -48,6 +45,7 @@ AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [
     ok = SDL.SetWindowMinimumSize(appState.window, GAME_WIDTH, GAME_HEIGHT); assert(ok, "Failed to set window min size")
 
     appState.running = true
+    appState.appContext = context
 
     rawAppState^ = appState
 
@@ -55,8 +53,8 @@ AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [
 }
 
 AppEvent: SDL.AppEvent_func : proc "c" (rawAppState: rawptr, event: ^SDL.Event) -> SDL.AppResult {
-    context = GlobalContext
     appState := cast(^AppState)rawAppState
+    context = appState.appContext
 
     if event.type == .QUIT {
         appState.running = false
@@ -66,8 +64,8 @@ AppEvent: SDL.AppEvent_func : proc "c" (rawAppState: rawptr, event: ^SDL.Event) 
 }
 
 AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResult {
-    context = GlobalContext
     appState := cast(^AppState)rawAppState
+    context = appState.appContext
 
     if !appState.running do return .SUCCESS
 
@@ -115,6 +113,7 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
                 color: Pixel
 
                 // When the windowSize is odd, the right or bottom black bar will be 1px bigger
+                // TODO: When resizing, this couses ~vibration in the position of the game window. FIX IT
                 leftBoxSize   := PxPos{ xDiff/2, windowSize.y }
                 rightBoxSize   := PxPos{ xDiff/2 + xDiff%2, windowSize.y }
                 topBoxSize := PxPos{ windowSize.x, yDiff/2 }
@@ -162,8 +161,9 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     return .CONTINUE
 }
 
-AppQuit: SDL.AppQuit_func : proc "c" (appstate: rawptr, result: SDL.AppResult) {
-    context = GlobalContext
+AppQuit: SDL.AppQuit_func : proc "c" (rawAppState: rawptr, result: SDL.AppResult) {
+    appState := cast(^AppState)rawAppState
+    context = appState.appContext
 
     fmt.println("Application exited with:", result)
 }
