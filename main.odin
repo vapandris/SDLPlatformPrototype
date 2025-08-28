@@ -2,6 +2,7 @@ package platform
 
 import "core:fmt"
 import "core:c"
+import "core:math"
 import "base:runtime"
 import SDL "vendor:sdl3"
 
@@ -23,18 +24,27 @@ Pixel :: struct {
 }
 
 AppState :: struct {
+    appContext: runtime.Context,
+
+    // Rendering:
     window: ^SDL.Window,
     renderer: ^SDL.Renderer,
+
+    // Audio:
+    spec: SDL.AudioSpec,
+    stream: ^SDL.AudioStream,
+
+    // Event data:
     running: bool,
-    appContext: runtime.Context,
 }
 
 AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [^]cstring) -> SDL.AppResult {
     context = runtime.default_context()
 
     appState := new(AppState); assert(appState != nil, "Failed to allocate appState")
+    appState.appContext = context
 
-    ok := SDL.Init({.VIDEO}); assert(ok, "Failed to init SDL")
+    ok := SDL.Init({.VIDEO, .AUDIO}); assert(ok, "Failed to init SDL")
 
     ok = SDL.CreateWindowAndRenderer(
         "Buffer example with callbacks",
@@ -44,8 +54,15 @@ AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [
     ); assert(ok, "Failed to create window and renderer")
     ok = SDL.SetWindowMinimumSize(appState.window, GAME_WIDTH, GAME_HEIGHT); assert(ok, "Failed to set window min size")
 
+    appState.spec = {
+        channels = 1,
+        format = .F32,
+        freq = 8000,
+    }
+    appState.stream = SDL.OpenAudioDeviceStream(SDL.AUDIO_DEVICE_DEFAULT_PLAYBACK, &appState.spec, nil, nil); assert(appState.stream != nil, "Failed to Open AudioDevice and Stream")
+    SDL.ResumeAudioStreamDevice(appState.stream)
+
     appState.running = true
-    appState.appContext = context
 
     rawAppState^ = appState
 
@@ -83,6 +100,28 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
 
                 gameScreen[y*GAME_WIDTH + x] = color
         }
+    }
+
+    // Really bad way to feed audio (sin wave) to the audio device buffer thinggy
+    // We try to keep feeding data to the buffer, as long as it has less than half a second's sample data
+    // one second has spec.freq amount of samples that are f32
+    minimumAudio := (appState.spec.freq * size_of(f32) / 2)
+    if SDL.GetAudioStreamQueued(appState.stream) < minimumAudio {
+        @static samples: [512]f32
+        @static currentSinSample: u16
+
+        for i in 0..<len(samples) {
+            // sin wave data:
+            freq := 440
+            phase := f32(currentSinSample) * f32(freq) / f32(appState.spec.freq)
+            samples[i] = math.sin(f32(phase * 2 * math.PI))
+
+            currentSinSample += 1
+        }
+
+        currentSinSample %= u16(appState.spec.freq)
+
+        SDL.PutAudioStreamData(appState.stream, cast(rawptr)(&samples[0]), size_of(samples))
     }
 
     // =======================
