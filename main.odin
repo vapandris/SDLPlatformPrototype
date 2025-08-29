@@ -26,6 +26,8 @@ Pixel :: struct {
 AppState :: struct {
     appContext: runtime.Context,
 
+    framsPerSec: u32,
+
     // Rendering:
     window: ^SDL.Window,
     renderer: ^SDL.Renderer,
@@ -43,6 +45,7 @@ AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [
 
     appState := new(AppState); assert(appState != nil, "Failed to allocate appState")
     appState.appContext = context
+    appState.framsPerSec = 60
 
     ok := SDL.Init({.VIDEO, .AUDIO}); assert(ok, "Failed to init SDL")
 
@@ -85,6 +88,8 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     context = appState.appContext
 
     if !appState.running do return .SUCCESS
+
+    frameStart: u64 = SDL.GetTicks()
 
     // =========================================
     // TODO: Put (call to) gameplay code here ||
@@ -178,15 +183,10 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
                     // When we add scaling to the mix, it will STILL use the original GAME_WIDTH, and scale down the indexing:
                     // • ((y-yDiff/2)/scaler)*GAME_WIDTH + ((x-xDiff/2)/scaler)
                     shiftedLocation := ((y-yDiff/2)/scaler)*GAME_WIDTH + ((x-xDiff/2)/scaler)
-                    if shiftedLocation >= 57600 {
-                        fmt.println(windowSize, "|", PxPos { xDiff, yDiff }, "|", gameAreaSize, "|", scaler)
-                        fmt.println(shiftedLocation, "= {x: ", x-xDiff/2, ", y: ", y-yDiff/2, "}", "| {x: ", x, ", y: ", y, "}")
-                    }
                     color = gameScreen[shiftedLocation]
                 }
 
                 pixels[y * (int(pitch) / 4) + x] = color
-
             }
         }
     }
@@ -195,7 +195,13 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     SDL.RenderClear(appState.renderer)
     SDL.RenderTexture(appState.renderer, buffer, nil, nil)
     SDL.RenderPresent(appState.renderer)
-    SDL.Delay(16)
+
+    frameTime: u64 = SDL.GetTicks() - frameStart
+    frameDelay: u32 = 1000 / appState.framsPerSec
+    fmt.println(frameDelay, frameTime)
+    if frameTime < u64(frameDelay) {
+        SDL.Delay(frameDelay - u32(frameTime))
+    }
 
     return .CONTINUE
 }
