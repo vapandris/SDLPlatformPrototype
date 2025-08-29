@@ -136,7 +136,7 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     SDL.GetWindowSize(appState.window, cast(^c.int)&windowSize.x, cast(^c.int)&windowSize.y)
 
     // Pixel color order is reversed because of endianness and historycal stuff (that's why ABRG instead if RGBA)
-    buffer := SDL.CreateTexture(appState.renderer, .ABGR8888, .STREAMING, c.int(windowSize.x), c.int(windowSize.y)); assert(buffer != nil, "Failed to create frame buffer texture")
+    buffer := SDL.CreateTexture(appState.renderer, .ABGR8888, .STREAMING, GAME_WIDTH, GAME_HEIGHT); assert(buffer != nil, "Failed to create frame buffer texture")
     defer SDL.DestroyTexture(buffer)
 
     // Set buffer/pixels in it to be drawn
@@ -146,61 +146,37 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
         SDL.LockTexture(buffer, nil, cast(^rawptr)(&pixels), &pitch); assert(pixels != nil, "Failed to lock texture")
         defer SDL.UnlockTexture(buffer)
 
-        scaler := min(windowSize.x/GAME_WIDTH, windowSize.y/GAME_HEIGHT)
-        gameAreaSize := PxPos{ GAME_WIDTH, GAME_HEIGHT } * scaler
-        xDiff := windowSize.x - gameAreaSize.x
-        yDiff := windowSize.y - gameAreaSize.y
-
-
-        for y in 0..<windowSize.y {
-            for x in 0..<windowSize.x {
-                color: Pixel
-
-                // When the windowSize is odd, the right or bottom black bar will be 1px bigger
-                // TODO: When resizing, this couses ~vibration in the position of the game window. FIX IT
-                leftBoxSize   := PxPos{ xDiff/2, windowSize.y }
-                rightBoxSize   := PxPos{ xDiff/2 + xDiff%2, windowSize.y }
-                topBoxSize := PxPos{ windowSize.x, yDiff/2 }
-                botBoxSize := PxPos{ windowSize.x, yDiff/2+yDiff%2 }
-
-                leftBoxPos := PxPos{ 0, 0 }
-                rightBoxPos := PxPos{ leftBoxSize.x + gameAreaSize.x, 0 }
-                topBoxPos := PxPos{ 0, 0 }
-                botBoxPos := PxPos{ 0, topBoxSize.y + gameAreaSize.y }
-
-
-                leftBoxCollide := IsPointInsideRect( { x, y }, leftBoxPos, leftBoxSize)
-                rightBoxCollide := IsPointInsideRect( { x, y }, rightBoxPos, rightBoxSize)
-                topBoxCollide := IsPointInsideRect( { x, y }, topBoxPos, topBoxSize)
-                botBoxCollide := IsPointInsideRect( { x, y }, botBoxPos, botBoxSize)
-
-                if !(leftBoxCollide || rightBoxCollide  ||
-                   topBoxCollide || botBoxCollide) {
-                    // Normally indexing the gameScreen buffer would be:
-                    // • y * GAME_WIDTH + x
-                    // When we add the black-border-offset to the mix, it will be:
-                    // • (y-yDiff/2) GAME_WIDTH + x
-                    // When we add scaling to the mix, it will STILL use the original GAME_WIDTH, and scale down the indexing:
-                    // • ((y-yDiff/2)/scaler)*GAME_WIDTH + ((x-xDiff/2)/scaler)
-                    shiftedLocation := ((y-yDiff/2)/scaler)*GAME_WIDTH + ((x-xDiff/2)/scaler)
-                    color = gameScreen[shiftedLocation]
-                }
-
-                pixels[y * (int(pitch) / 4) + x] = color
+        for y in 0..<GAME_HEIGHT {
+            for x in 0..<GAME_WIDTH {
+                pixels[y * GAME_WIDTH + x] = gameScreen[y * GAME_WIDTH + x]
             }
         }
     }
 
+    // Prepare target rectangle where the gameScreen will be located:
+    scaler := min(windowSize.x/GAME_WIDTH, windowSize.y/GAME_HEIGHT)
+    scaledWidth  := GAME_WIDTH * scaler
+    scaledHeight := GAME_HEIGHT * scaler
+    dstRect := SDL.FRect{
+        f32(windowSize.x - scaledWidth)  / 2,
+        f32(windowSize.y - scaledHeight) / 2,
+        f32(scaledWidth), f32(scaledHeight),
+    }
+
     // Render all the pixels put into the buffer texture:
+    SDL.SetRenderDrawColor(appState.renderer, 0, 0, 0, 255)
     SDL.RenderClear(appState.renderer)
-    SDL.RenderTexture(appState.renderer, buffer, nil, nil)
+
+    SDL.RenderTexture(appState.renderer, buffer, nil, &dstRect)
     SDL.RenderPresent(appState.renderer)
 
     frameTime: u64 = SDL.GetTicks() - frameStart
     frameDelay: u32 = 1000 / appState.framsPerSec
-    fmt.println(frameDelay, frameTime)
     if frameTime < u64(frameDelay) {
+        //fmt.println(frameDelay, frameTime, "|", frameDelay - u32(frameTime))
         SDL.Delay(frameDelay - u32(frameTime))
+    } else {
+        fmt.println("LONG FRAME!!")
     }
 
     return .CONTINUE
