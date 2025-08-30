@@ -13,11 +13,6 @@ GAME_WIDTH  :: 320
 GAME_HEIGHT :: 180
 
 PxPos :: [2]int
-IsPointInsideRect :: proc(point: PxPos, rectTopLeft: PxPos, rectSize: PxPos) -> bool {
-    xCollision := rectTopLeft.x <= point.x && point.x < rectTopLeft.x + rectSize.x
-    yCollision := rectTopLeft.y <= point.y && point.y < rectTopLeft.y + rectSize.y
-    return xCollision && yCollision
-}
 
 Pixel :: struct {
     r, g, b, a: u8
@@ -112,7 +107,7 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     // one second has spec.freq amount of samples that are f32
     minimumAudio := (appState.spec.freq * size_of(f32) / 2)
     if SDL.GetAudioStreamQueued(appState.stream) < minimumAudio {
-        @static samples: [512]f32
+        @static samples: [170]f32
         @static currentSinSample: u16
 
         for i in 0..<len(samples) {
@@ -166,17 +161,16 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     // Render all the pixels put into the buffer texture:
     SDL.SetRenderDrawColor(appState.renderer, 0, 0, 0, 255)
     SDL.RenderClear(appState.renderer)
-
     SDL.RenderTexture(appState.renderer, buffer, nil, &dstRect)
     SDL.RenderPresent(appState.renderer)
 
+    // Delay according to the current frame's time:
     frameTime: u64 = SDL.GetTicks() - frameStart
     frameDelay: u32 = 1000 / appState.framsPerSec
     if frameTime < u64(frameDelay) {
-        //fmt.println(frameDelay, frameTime, "|", frameDelay - u32(frameTime))
         SDL.Delay(frameDelay - u32(frameTime))
     } else {
-        fmt.println("LONG FRAME!!")
+        fmt.println("LONG FRAME!!", frameTime - u64(frameDelay), "ms longer")
     }
 
     return .CONTINUE
