@@ -35,6 +35,25 @@ AppState :: struct {
     running: bool,
 }
 
+// -------------------------------
+// TODO: Move to GAME section:
+Key :: enum {
+    UP, DOWN, LEFT, RIGHT,
+}
+
+// State of the keys shall be checked at the start of each frame.
+KeyState :: struct {
+    isDown: bool,
+
+    // Number of times, the given key went from up->down, or down->up
+    // This field shall be reset to 0 at the start of the frame when the key-input is processed.
+    transitionCount: u8,
+}
+
+//SavedKeyInput: [Key]KeyState = {}
+KeyInput: [Key]KeyState = {}
+// -------------------------------
+
 AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [^]cstring) -> SDL.AppResult {
     context = runtime.default_context()
 
@@ -71,8 +90,36 @@ AppEvent: SDL.AppEvent_func : proc "c" (rawAppState: rawptr, event: ^SDL.Event) 
     appState := cast(^AppState)rawAppState
     context = appState.appContext
 
-    if event.type == .QUIT {
+    #partial switch event.type {
+    case .QUIT: {
         appState.running = false
+    }
+    case .KEY_DOWN: fallthrough
+    case .KEY_UP: {
+        switch event.key.key {
+        case SDL.K_A:
+            if (event.type == .KEY_DOWN) != KeyInput[.LEFT].isDown {
+                KeyInput[.LEFT].transitionCount += 1
+            }
+            KeyInput[.LEFT].isDown = (event.type == .KEY_DOWN)
+
+        case SDL.K_W:
+            if (event.type == .KEY_DOWN) != KeyInput[.UP].isDown {
+                KeyInput[.UP].transitionCount += 1
+            }
+            KeyInput[.UP].isDown = (event.type == .KEY_DOWN)
+        case SDL.K_S:
+            if (event.type == .KEY_DOWN) != KeyInput[.DOWN].isDown {
+                KeyInput[.DOWN].transitionCount += 1
+            }
+            KeyInput[.DOWN].isDown = (event.type == .KEY_DOWN)
+        case SDL.K_D:
+            if (event.type == .KEY_DOWN) != KeyInput[.RIGHT].isDown {
+                KeyInput[.RIGHT].transitionCount += 1
+            }
+            KeyInput[.RIGHT].isDown = (event.type == .KEY_DOWN)
+        }
+    }
     }
 
     return .CONTINUE
@@ -89,14 +136,30 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     // =========================================
     // TODO: Put (call to) gameplay code here ||
     // =========================================
+    // Get keyboard state:
+    //SavedKeyInput = KeyInput
+    for &input in KeyInput do input.transitionCount = 0
+
+    // Render
     gameScreen: [GAME_WIDTH * GAME_HEIGHT]Pixel
     for y in 0..<GAME_HEIGHT {
         for x in 0..<GAME_WIDTH {
-                color := Pixel{}
+            color := Pixel{}
+            if KeyInput[.UP].isDown {
                 color.r = u8(x % 0xFF)
                 color.g = u8(y % 0xFF)
-                color.b = u8(int(color.r/2 + color.g/2) % 256)
                 color.a = 0xFF
+            } else {
+                color.r = u8(y % 0xFF)
+                color.g = u8(x % 0xFF)
+                color.a = 0xFF
+            }
+
+            if KeyInput[.LEFT].isDown {
+                color.b = u8(int(f32(color.r)*0.25 + f32(color.g)*0.75) % 256)
+            } else {
+                color.b = u8(int(f32(color.r)*0.75 + f32(color.g)*0.25) % 256)
+            }
 
                 gameScreen[y*GAME_WIDTH + x] = color
         }
