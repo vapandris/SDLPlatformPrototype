@@ -61,11 +61,10 @@ KeyInput: [Key]KeyState = {}
 // key up          |xx   | xxx |   xx|x  xx|
 // key down        |  xxx|x   x|xxx  | xx  |
 // trans.Count     |0 1  |01  2|0  1 |01 2 |
-// WasKeyDown      |  T  |  F  |  F  |  T  |
+// WasKeyDown      |  F  |  T  |  T  |  F  |
 // Frame Count <-0th <-1th <-2nd <-3rd <-4th
 WasKeyDown :: proc(key: Key) -> bool {
-    return KeyInput[key].isDown == ((KeyInput[key].transitionCount % 2) == 0)
-
+    return KeyInput[key].isDown != ((KeyInput[key].transitionCount % 2) == 0)
 }
 IsKeyDown :: proc(key: Key) -> bool {
     return KeyInput[key].isDown || KeyInput[key].transitionCount != 0
