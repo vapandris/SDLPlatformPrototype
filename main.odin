@@ -50,8 +50,29 @@ KeyState :: struct {
     transitionCount: u8,
 }
 
-//SavedKeyInput: [Key]KeyState = {}
+
 KeyInput: [Key]KeyState = {}
+
+// isDown          |  F  |  F  |  T  |  T  |
+// ----------------+-----+-----+-----+-----+
+// trans.Count % 2 |  F  |  T  |  F  |  T  |
+// ----------------+-----+-----+-----+-----+
+// ================ EXAMPLE ================
+// key up          |xx   | xxx |   xx|x  xx|
+// key down        |  xxx|x   x|xxx  | xx  |
+// trans.Count     |0 1  |01  2|0  1 |01 2 |
+// WasKeyDown      |  T  |  F  |  F  |  T  |
+// Frame Count <-0th <-1th <-2nd <-3rd <-4th
+WasKeyDown :: proc(key: Key) -> bool {
+    return KeyInput[key].isDown == ((KeyInput[key].transitionCount % 2) == 0)
+
+}
+IsKeyDown :: proc(key: Key) -> bool {
+    return KeyInput[key].isDown || KeyInput[key].transitionCount != 0
+}
+IsKeyPressed :: proc(key: Key) -> bool {
+    return KeyInput[key].isDown
+}
 // -------------------------------
 
 AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [^]cstring) -> SDL.AppResult {
