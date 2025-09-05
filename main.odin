@@ -53,18 +53,18 @@ KeyState :: struct {
 
 KeyInput: [Key]KeyState = {}
 
-// isDown          |  F  |  F  |  T  |  T  |
-// ----------------+-----+-----+-----+-----+
-// trans.Count % 2 |  F  |  T  |  F  |  T  |
-// ----------------+-----+-----+-----+-----+
-// ================ EXAMPLE ================
-// key up          |xx   | xxx |   xx|x  xx|
-// key down        |  xxx|x   x|xxx  | xx  |
-// trans.Count     |0 1  |01  2|0  1 |01 2 |
-// WasKeyDown      |  F  |  T  |  T  |  F  |
+// isDown          |  F  |  F  |  T  |  T  ||  F  |  T  |
+// ----------------+-----+-----+-----+-----++-----+-----+
+// trans.Count % 2 |  T  |  F  |  T  |  F  ||  T  |  T  |
+// ----------------+-----+-----+-----+-----++-----+-----+
+// ====================== EXAMPLE ======================
+// key up          |xx   | xxx |   xx|x  xx||xxxxx|     |
+// key down        |  xxx|x   x|xxx  | xx  ||     |xxxxx|
+// trans.Count     |1 2  |12  3|1  2 |12 3 ||0    |0    |
+// WasKeyDown      |  F  |  T  |  T  |  F  ||  F  |  T  |
 // Frame Count       <-1th <-2nd <-3rd <-4th
 WasKeyDown :: proc(key: Key) -> bool {
-    return (KeyInput[key].isDown != ((KeyInput[key].transitionCount % 2) == 0)) && KeyInput[key].transitionCount != 0
+    return  KeyState[key].isDown == (KeyState[key].transitionCount % 2 == 0)
 }
 
 IsKeyDown :: proc(key: Key) -> bool {
