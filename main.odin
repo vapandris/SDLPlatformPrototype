@@ -33,6 +33,7 @@ AppState :: struct {
 
     // Event data:
     running: bool,
+    gameplayRunning: bool
 }
 
 // -------------------------------
@@ -53,26 +54,33 @@ KeyState :: struct {
 
 KeyInput: [Key]KeyState = {}
 
-// isDown          |  F  |  F  |  T  |  T  ||  F  |  T  |
+// isDown          |  T  |  T  |  F  |  F  ||  F  |  T  |
 // ----------------+-----+-----+-----+-----++-----+-----+
-// trans.Count % 2 |  T  |  F  |  T  |  F  ||  T  |  T  |
+// trans.Count % 2 |  F  |  T  |  F  |  T  ||  T  |  F  |
 // ----------------+-----+-----+-----+-----++-----+-----+
-// ====================== EXAMPLE ======================
+// ====================== EXAMPLE ================
 // key up          |xx   | xxx |   xx|x  xx||xxxxx|     |
 // key down        |  xxx|x   x|xxx  | xx  ||     |xxxxx|
-// trans.Count     |1 2  |12  3|1  2 |12 3 ||0    |0    |
+// trans.Count     |0 1  |01  2|0  1 |01 2 ||0    |0    |
 // WasKeyDown      |  F  |  T  |  T  |  F  ||  F  |  T  |
 // Frame Count       <-1th <-2nd <-3rd <-4th
 WasKeyDown :: proc(key: Key) -> bool {
-    return  KeyState[key].isDown == (KeyState[key].transitionCount % 2 == 0)
+    return  KeyInput[key].isDown == (KeyInput[key].transitionCount % 2 == 0)
 }
 
+// isDown           |  F  |  F  |  T  |  T  ||  F  |  T  |
+// -----------------+-----+-----+-----+-----++-----+-----+
+// trans.Count != 0 |  T  |  F  |  T  |  F  ||  T  |  T  |
+// -----------------+-----+-----+-----+-----++-----+-----+
+// ====================== EXAMPLE ======================
+// key up           | xx  |
+// key down         |x  xx|
+// trans.Count      |01 2 |
+// IsKeyDown        |  T  |  F  |  T  |  T  |
 IsKeyDown :: proc(key: Key) -> bool {
     return KeyInput[key].isDown || KeyInput[key].transitionCount != 0
 }
-IsKeyPressed :: proc(key: Key) -> bool {
-    return KeyInput[key].isDown
-}
+
 // -------------------------------
 
 AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [^]cstring) -> SDL.AppResult {
@@ -110,6 +118,8 @@ AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [
 AppEvent: SDL.AppEvent_func : proc "c" (rawAppState: rawptr, event: ^SDL.Event) -> SDL.AppResult {
     appState := cast(^AppState)rawAppState
     context = appState.appContext
+    assert(appState.gameplayRunning != true)
+    fmt.println(appState.gameplayRunning)
 
     #partial switch event.type {
     case .QUIT: {
@@ -159,6 +169,7 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     // =========================================
     // Get keyboard state:
     //SavedKeyInput = KeyInput
+    appState.gameplayRunning = true
     for &input in KeyInput do input.transitionCount = 0
 
     // Render
@@ -256,6 +267,7 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     } else {
         fmt.println("LONG FRAME!!", frameTime - u64(frameDelay), "ms longer")
     }
+    appState.gameplayRunning = false
 
     return .CONTINUE
 }
