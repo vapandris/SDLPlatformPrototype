@@ -56,7 +56,7 @@ KeyInput: [Key]KeyState = {}
 
 // isDown          |  T  |  T  |  F  |  F  ||  F  |  T  |
 // ----------------+-----+-----+-----+-----++-----+-----+
-// trans.Count % 2 |  F  |  T  |  F  |  T  ||  T  |  F  |
+// trans.Count % 2 |  F  |  T  |  F  |  T  ||  T  |  T  |
 // ----------------+-----+-----+-----+-----++-----+-----+
 // ====================== EXAMPLE ================
 // key up          |xx   | xxx |   xx|x  xx||xxxxx|     |
@@ -68,17 +68,26 @@ WasKeyDown :: proc(key: Key) -> bool {
     return  KeyInput[key].isDown == (KeyInput[key].transitionCount % 2 == 0)
 }
 
-// isDown           |  F  |  F  |  T  |  T  ||  F  |  T  |
-// -----------------+-----+-----+-----+-----++-----+-----+
-// trans.Count != 0 |  T  |  F  |  T  |  F  ||  T  |  T  |
-// -----------------+-----+-----+-----+-----++-----+-----+
-// ====================== EXAMPLE ======================
-// key up           | xx  |
-// key down         |x  xx|
-// trans.Count      |01 2 |
+// isDown           |  F  |  F  |  T  |  T  |
+// -----------------+-----+-----+-----+-----+
+// trans.Count != 0 |  T  |  F  |  T  |  F  |
+// -----------------+-----+-----+-----+-----+
+// ====================== EXAMPLE ===========
+// key up           | xx  |xxxxx| xx  |     |
+// key down         |x  xx|     |x  xx|xxxxx|
+// trans.Count      |01 2 |0    |01 2 |0    |
 // IsKeyDown        |  T  |  F  |  T  |  T  |
 IsKeyDown :: proc(key: Key) -> bool {
     return KeyInput[key].isDown || KeyInput[key].transitionCount != 0
+}
+
+// Original logic:
+// KeyInput[key].isDown == T -> return .trans.Count >= 1 or
+// KeyInput[key].isDown == F -> return .trans.Count >= 2
+// The same as:
+// trans.Count >= 1 + u8(!KeyState[key].isDown)
+IsKeyPressed :: proc(key: Key) -> bool {
+    return KeyInput[key].transitionCount >= 1 + u8(!KeyInput[key].isDown)
 }
 
 // -------------------------------
@@ -119,7 +128,6 @@ AppEvent: SDL.AppEvent_func : proc "c" (rawAppState: rawptr, event: ^SDL.Event) 
     appState := cast(^AppState)rawAppState
     context = appState.appContext
     assert(appState.gameplayRunning != true)
-    fmt.println(appState.gameplayRunning)
 
     #partial switch event.type {
     case .QUIT: {
@@ -168,16 +176,14 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     // TODO: Put (call to) gameplay code here ||
     // =========================================
     // Get keyboard state:
-    //SavedKeyInput = KeyInput
     appState.gameplayRunning = true
-    for &input in KeyInput do input.transitionCount = 0
 
     // Render
     gameScreen: [GAME_WIDTH * GAME_HEIGHT]Pixel
     for y in 0..<GAME_HEIGHT {
         for x in 0..<GAME_WIDTH {
             color := Pixel{}
-            if KeyInput[.UP].isDown {
+            if IsKeyPressed(.UP) {
                 color.r = u8(x % 0xFF)
                 color.g = u8(y % 0xFF)
                 color.a = 0xFF
@@ -187,7 +193,7 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
                 color.a = 0xFF
             }
 
-            if KeyInput[.LEFT].isDown {
+            if IsKeyPressed(.LEFT) {
                 color.b = u8(int(f32(color.r)*0.25 + f32(color.g)*0.75) % 256)
             } else {
                 color.b = u8(int(f32(color.r)*0.75 + f32(color.g)*0.25) % 256)
@@ -218,6 +224,8 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
 
         SDL.PutAudioStreamData(appState.stream, cast(rawptr)(&samples[0]), size_of(samples))
     }
+
+    for &input in KeyInput do input.transitionCount = 0
 
     // =======================
     // NOTE: Rendering code ||
