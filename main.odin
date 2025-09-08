@@ -6,6 +6,18 @@ import "core:math"
 import "base:runtime"
 import SDL "vendor:sdl3"
 
+// TODOs:
+// - switch to ns delay instead of ms delay, add deltaTime
+// - Add option (F11) to fullscreen: https://wiki.libsdl.org/SDL3/SDL_SetWindowFullscreen
+// - Audio: https://wiki.libsdl.org/SDL3/CategoryAudio
+//    - S16 instead of F32
+//    - callback
+//    - no callback
+// - (optional) Event:
+//    - use semaphores and copy to FrameKeyInput the content of KeyInput (most likely not needed)
+// - Move game out to its own API:
+//    - learn Odin visibility options for API
+
 WINDOW_WIDTH   :: 718
 WINDOW_HEIGHT  :: 180*2
 
@@ -21,7 +33,8 @@ Pixel :: struct {
 AppState :: struct {
     appContext: runtime.Context,
 
-    framsPerSec: u32,
+    framesPerSec: u32,
+    deltaTime: f32, // millisec.
 
     // Rendering:
     window: ^SDL.Window,
@@ -97,7 +110,7 @@ AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [
 
     appState := new(AppState); assert(appState != nil, "Failed to allocate appState")
     appState.appContext = context
-    appState.framsPerSec = 60
+    appState.framesPerSec = 60
 
     ok := SDL.Init({.VIDEO, .AUDIO}); assert(ok, "Failed to init SDL")
 
@@ -111,7 +124,7 @@ AppInit: SDL.AppInit_func : proc "c" (rawAppState: ^rawptr, argc: c.int, argv: [
 
     appState.spec = {
         channels = 1,
-        format = .F32,
+        format = .F32, // TODO: change to S16
         freq = 8000,
     }
     appState.stream = SDL.OpenAudioDeviceStream(SDL.AUDIO_DEVICE_DEFAULT_PLAYBACK, &appState.spec, nil, nil); assert(appState.stream != nil, "Failed to Open AudioDevice and Stream")
@@ -170,7 +183,7 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
 
     if !appState.running do return .SUCCESS
 
-    frameStart: u64 = SDL.GetTicks()
+    frameStart: u64 = SDL.GetTicksNS()
 
     // =========================================
     // TODO: Put (call to) gameplay code here ||
@@ -268,12 +281,16 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     SDL.RenderPresent(appState.renderer)
 
     // Delay according to the current frame's time:
-    frameTime: u64 = SDL.GetTicks() - frameStart
-    frameDelay: u32 = 1000 / appState.framsPerSec
-    if frameTime < u64(frameDelay) {
-        SDL.Delay(frameDelay - u32(frameTime))
+    frameTime: u64 = SDL.GetTicksNS() - frameStart
+    frameDelay: u64 = 1000*1000*1000 / u64(appState.framesPerSec)
+    if frameTime < frameDelay {
+        appState.deltaTime = f32(frameDelay) / 1000*1000
+        SDL.DelayNS(frameDelay - frameTime)
     } else {
-        fmt.println("LONG FRAME!!", frameTime - u64(frameDelay), "ms longer")
+        appState.deltaTime = f32(frameTime) / 1000*1000
+        fmt.println("LONG FRAME!!", frameTime - frameDelay, "ns longer:")
+        fmt.println("frameTime =", frameTime)
+        fmt.println("frameDelay =", frameDelay)
     }
     appState.gameplayRunning = false
 
