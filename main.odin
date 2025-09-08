@@ -264,6 +264,7 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
 
     // Pixel color order is reversed because of endianness and historycal stuff (that's why ABRG instead if RGBA)
     buffer := SDL.CreateTexture(appState.renderer, .ABGR8888, .STREAMING, GAME_WIDTH, GAME_HEIGHT); assert(buffer != nil, "Failed to create frame buffer texture")
+    SDL.SetTextureScaleMode(buffer, .NEAREST)
     defer SDL.DestroyTexture(buffer)
 
     // Set buffer/pixels in it to be drawn
