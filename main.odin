@@ -7,8 +7,6 @@ import "base:runtime"
 import SDL "vendor:sdl3"
 
 // TODOs:
-// - switch to ns delay instead of ms delay, add deltaTime
-// - Add option (F11) to fullscreen: https://wiki.libsdl.org/SDL3/SDL_SetWindowFullscreen
 // - Audio: https://wiki.libsdl.org/SDL3/CategoryAudio
 //    - S16 instead of F32
 //    - callback
@@ -46,13 +44,16 @@ AppState :: struct {
 
     // Event data:
     running: bool,
-    gameplayRunning: bool
+    gameplayRunning: bool,
+    fullscreen: bool,
+    updateFullscreen: bool,
 }
 
 // -------------------------------
 // TODO: Move to GAME section:
 Key :: enum {
     UP, DOWN, LEFT, RIGHT,
+    FULLSCREEN,
 }
 
 // State of the keys shall be checked at the start of each frame.
@@ -170,6 +171,17 @@ AppEvent: SDL.AppEvent_func : proc "c" (rawAppState: rawptr, event: ^SDL.Event) 
                 KeyInput[.RIGHT].transitionCount += 1
             }
             KeyInput[.RIGHT].isDown = (event.type == .KEY_DOWN)
+        case SDL.K_F11:
+            if (event.type == .KEY_DOWN) != KeyInput[.FULLSCREEN].isDown {
+                KeyInput[.FULLSCREEN].transitionCount += 1
+            }
+            KeyInput[.FULLSCREEN].isDown = (event.type == .KEY_DOWN)
+        }
+
+        if appState.updateFullscreen {
+            appState.updateFullscreen = false
+            appState.fullscreen = !appState.fullscreen
+            SDL.SetWindowFullscreen(appState.window, appState.fullscreen)
         }
     }
     }
@@ -190,6 +202,10 @@ AppIterate: SDL.AppIterate_func : proc "c" (rawAppState: rawptr) -> SDL.AppResul
     // =========================================
     // Get keyboard state:
     appState.gameplayRunning = true
+
+    if IsKeyPressed(.FULLSCREEN) {
+        appState.updateFullscreen = true
+    }
 
     // Render
     gameScreen: [GAME_WIDTH * GAME_HEIGHT]Pixel
